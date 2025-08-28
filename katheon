@@ -1,0 +1,581 @@
+!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Soul Simulator — Prototype</title>
+<style>
+  body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 18px; background:#0f1113; color:#e6eef6; }
+  header { display:flex; gap:12px; align-items:center; margin-bottom:14px; }
+  h1 { margin:0; font-size:20px; }
+  .panel { background:#111217; border-radius:10px; padding:12px; box-shadow:0 6px 20px rgba(0,0,0,.6); }
+  .row { display:flex; gap:12px; align-items:center; margin-bottom:10px; }
+  input, select, button { padding:8px 10px; border-radius:8px; border:1px solid #222; background:#0f1113; color:#e6eef6; }
+  button { cursor:pointer; border:1px solid #2d7; background:linear-gradient(#133,#0b2); color:#051; width:140px; font-weight:700; }
+  button.ghost { background:transparent; border:1px solid #333; color:#cfe; width:auto; }
+  .layout { display:grid; grid-template-columns:360px 1fr; gap:14px; }
+  canvas { background:#05060a; border-radius:8px; display:block; }
+  label { font-size:12px; color:#9fb1c4; }
+  .palette { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .small { font-size:13px; padding:6px 8px; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .muted { color:#9aaebf; font-size:13px; }
+  .stat { color:#7bd389; font-weight:600; }
+  .danger { color:#ff6b6b; font-weight:700; }
+  .karmic { color:#ffb86b; font-weight:600; }
+  footer { margin-top:12px; font-size:12px; color:#8299b2; }
+  .meter { height:10px; background:#081018; border-radius:6px; overflow:hidden; }
+  .meter > i { display:block; height:100%; background:linear-gradient(#2ad2b2,#7bd389); }
+  .ageButton { width:260px; height:84px; font-size:18px; border-radius:14px; }
+  .prompt { margin-top:12px; font-size:15px; color:#dbeaef; min-height:30px; }
+  .choiceBtn { padding:10px 12px; border-radius:8px; border:1px solid #333; background:transparent; color:#cfe; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Soul Simulator — Prototype</h1>
+  <div class="muted">One screen. Age up. Cross over — or pay karmic consequences.</div>
+</header>
+
+<div class="layout">
+  <div class="panel">
+    <div class="row">
+      <div style="flex:1">
+        <label>Soul name</label><br>
+        <input id="soulName" placeholder="Name your soul" />
+      </div>
+      <div style="width:140px">
+        <label>Archetype</label><br>
+        <select id="archetype">
+          <option value="Wanderer">Wanderer</option>
+          <option value="Healer">Healer</option>
+          <option value="Warrior">Warrior</option>
+          <option value="Seeker">Seeker</option>
+          <option value="Trickster">Trickster</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:8px" class="row">
+      <button id="createBtn" class="">Create Soul (Pass Away)</button>
+      <button id="randomBtn" class="ghost small">Randomize</button>
+      <button id="resetBtn" class="ghost small">Reset</button>
+    </div>
+
+    <hr style="border:none;height:1px;background:#081018;margin:10px 0">
+
+    <div style="text-align:center">
+      <button id="ageBtn" class="ageButton">Age Up</button>
+      <div class="prompt" id="promptText">Press “Age Up” to begin — each click advances one turn/year.</div>
+
+      <div style="margin-top:10px; display:flex; gap:8px; justify-content:center;">
+        <div id="choiceContainer"></div>
+      </div>
+    </div>
+
+    <hr style="border:none;height:1px;background:#081018;margin:10px 0">
+
+    <div class="controls" style="justify-content:space-between;align-items:center">
+      <div>
+        <button id="exportJson" class="ghost small">Export JSON</button>
+        <button id="exportPng" class="ghost small">Export Image</button>
+      </div>
+      <div class="muted">Auto mode: <input id="autoToggle" type="checkbox" /> <span style="margin-left:6px">Autoplay</span></div>
+    </div>
+
+    <footer>
+      Crossing rules: fail to meet the crossing goal and you accrue karmic debt. Too much debt → reincarnation with penalties.
+    </footer>
+  </div>
+
+  <div>
+    <div class="panel" style="padding:10px 12px 16px 12px; margin-bottom:12px">
+      <div style="display:flex; gap:12px; align-items:center">
+        <div style="flex:1">
+          <div style="display:flex; gap:8px; align-items:baseline">
+            <h2 id="displayName" style="margin:0;font-size:16px">—</h2>
+            <div id="displayType" class="muted" style="font-size:13px"></div>
+            <div style="margin-left:12px;font-size:13px" id="phaseLabel"></div>
+            <div style="margin-left:8px;font-size:13px" id="ageLabel" class="muted"></div>
+          </div>
+          <div id="attrText" class="muted" style="margin-top:6px">Attributes will appear here.</div>
+
+          <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+            <div style="flex:1">
+              <label>Crossing progress</label>
+              <div class="meter" style="margin-top:6px"><i id="crossMeter" style="width:0%"></i></div>
+              <div class="muted" id="crossText" style="font-size:12px;margin-top:6px">—</div>
+            </div>
+            <div style="width:110px; text-align:right">
+              <div class="muted" style="font-size:12px">Karmic debt</div>
+              <div id="karmicText" class="karmic" style="font-size:18px">0</div>
+            </div>
+          </div>
+
+          <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+            <div class="muted">Turns left: <span id="turnsLeft">—</span></div>
+            <div style="margin-left:10px" class="muted">Reincarnations: <span id="reincCount">0</span></div>
+          </div>
+
+        </div>
+        <div style="width:160px">
+          <label>Seed (optional)</label><br>
+          <input id="seed" placeholder="e.g. 1234" />
+        </div>
+      </div>
+
+      <div style="display:flex; gap:12px; margin-top:12px; align-items:flex-start">
+        <canvas id="radar" width="320" height="320"></canvas>
+        <canvas id="timeline" width="480" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:10px">
+      <label>Event log</label>
+      <div id="log" style="height:220px; overflow:auto; padding:8px; margin-top:8px; background:#080b0f; border-radius:6px; border:1px solid #0f1720; font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Simple seeded RNG (mulberry32) */
+function seededRng(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s += 0x6D2B79F5 | 0;
+    var t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
+/* Utility */
+const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Math.round(v)));
+const randBetween = (rng,a,b)=> a + (b-a)*rng();
+
+/* Core model */
+const ATTRS = ['Curiosity','Compassion','Courage','Wisdom','Shadow'];
+
+function defaultBaseForArchetype(arch) {
+  const map = {
+    Wanderer:  [75,40,55,50,30],
+    Healer:    [45,85,40,60,25],
+    Warrior:   [40,35,85,45,40],
+    Seeker:    [85,50,45,55,35],
+    Trickster: [65,45,55,40,50]
+  };
+  return map[arch] || [50,50,50,50,30];
+}
+
+function createSoul({name='Unnamed', archetype='Wanderer', seed=null}) {
+  const rng = seed ? seededRng(Number(seed)) : Math.random;
+  const base = defaultBaseForArchetype(archetype);
+  const attrs = {};
+  for (let i=0;i<ATTRS.length;i++){
+    attrs[ATTRS[i]] = clamp(base[i] + Math.round(randBetween(rng,-8,8)), 0, 100);
+  }
+  // crossing phase: start as a passing soul who must cross over
+  const crossingGoal = 20;      // how much progress needed to cross
+  const crossingMaxTurns = 10;  // how many turns you get to reach it
+  return {
+    name,
+    archetype,
+    attrs,
+    age: 0,
+    history: [ {...attrs} ],
+    log: [],
+    rngSeed: seed || null,
+    phase: 'crossing',
+    crossingProgress: 0,
+    crossingGoal,
+    crossingTurnsLeft: crossingMaxTurns,
+    crossingMaxTurns,
+    karmicDebt: 0,
+    maxKarmicDebt: 10,
+    reincarnations: 0
+  };
+}
+
+/* Event generator for one-screen Age Up style (turn = 1 year) */
+function sampleEventForSoul(soul, rng) {
+  // weight event pools by archetype and age stage; simplified for prototype
+  const age = soul.age;
+  const poolCommon = [
+    { type: 'routine', text: 'You remember a small kindness you once received.', impact: {choice:false, effects: () => ({ Compassion: +Math.ceil(randBetween(rng,1,3)), crossingProgress: +1, karmic: 0 }) }},
+    { type: 'routine', text: 'You spend time learning from a book.', impact: {choice:false, effects: () => ({ Wisdom:+Math.ceil(randBetween(rng,1,3)), crossingProgress:+1, karmic:0 }) }},
+    { type: 'routine', text: 'A test of bravery appears in small measure.', impact: {choice:false, effects: () => ({ Courage:+Math.ceil(randBetween(rng,0,3)), crossingProgress:+1, karmic:0 }) }},
+  ];
+
+  const poolChoice = [
+    { type:'choice', text:'You encounter someone in need on a rainy night.', choices:[ {t:'Help', effects: (rng)=>({ Compassion:+Math.ceil(randBetween(rng,2,6)), crossingProgress:+4, karmic:0 })}, {t:'Ignore', effects:(rng)=>({ Compassion:-Math.ceil(randBetween(rng,0,2)), crossingProgress: -1, karmic:+1 })}] },
+    { type:'choice', text:'An opportunity to cheat an advantage appears.', choices:[ {t:'Exploit', effects:(rng)=>({ Curiosity:+Math.ceil(randBetween(rng,1,4)), Shadow:+Math.ceil(randBetween(rng,2,6)), crossingProgress:-2, karmic:+2 })}, {t:'Decline', effects:(rng)=>({ Wisdom:+Math.ceil(randBetween(rng,0,3)), crossingProgress:+2, karmic:0 })}] },
+    { type:'choice', text:'A long-hidden fear returns. Face it?', choices:[ {t:'Confront', effects:(rng)=>({ Courage:+Math.ceil(randBetween(rng,3,8)), Shadow:-Math.ceil(randBetween(rng,0,3)), crossingProgress:+3, karmic:0 })}, {t:'Avoid', effects:(rng)=>({ Shadow:+Math.ceil(randBetween(rng,1,3)), crossingProgress:-1, karmic:+1 })}] },
+  ];
+
+  // rarity tuning
+  const r = rng();
+  if (r < 0.55) return poolCommon[Math.floor(randBetween(rng,0,poolCommon.length))];
+  if (r < 0.9) return poolChoice[Math.floor(randBetween(rng,0,poolChoice.length))];
+  // rare auto big event
+  return { type:'rare', text:'A mini-quest surfaces: the old debt must be repaid.', impact: {choice:true, choices:[ {t:'Attempt', effects:(rng)=>({ Wisdom:+5, Compassion:+3, crossingProgress:+6, karmic:0 })}, {t:'Flee', effects:(rng)=>({ Shadow:+5, crossingProgress:-4, karmic:+3 })}] } };
+}
+
+/* Rules: effects are applied via a common interface when resolved */
+function applyEffects(soul, effects) {
+  for (const k of ATTRS) {
+    if (effects[k]) {
+      soul.attrs[k] = clamp(soul.attrs[k] + effects[k]);
+    }
+  }
+  // crossing & karmic
+  if (typeof effects.crossingProgress !== 'undefined') soul.crossingProgress = Math.max(0, soul.crossingProgress + effects.crossingProgress);
+  if (typeof effects.karmic !== 'undefined') soul.karmicDebt = Math.max(0, soul.karmicDebt + effects.karmic);
+}
+
+/* Simulation step when aging up */
+function ageUp(soul) {
+  const rng = soul.rngSeed ? seededRng(Number(soul.rngSeed) + soul.history.length) : Math.random;
+  soul.age = (soul.age || 0) + 1;
+
+  // generate an event for this turn
+  const ev = sampleEventForSoul(soul, rng);
+
+  // prepare UI prompt and choices
+  return { ev, rng };
+}
+
+/* Crossing and reincarnation logic evaluated after each resolved event */
+function postResolveChecks(soul) {
+  // only decrement crossing turns when in crossing phase
+  if (soul.phase === 'crossing') {
+    soul.crossingTurnsLeft = Math.max(0, soul.crossingTurnsLeft - 1);
+    // immediate cross?
+    if (soul.crossingProgress >= soul.crossingGoal) {
+      soul.phase = 'afterlife';
+      soul.log.push({ time: soul.history.length-1, event:'Crossed Over', desc:`${soul.name} has passed over successfully.`, delta: {} });
+    } else if (soul.crossingTurnsLeft <= 0 && soul.crossingProgress < soul.crossingGoal) {
+      const missing = Math.max(0, soul.crossingGoal - soul.crossingProgress);
+      const debtCharge = Math.ceil(missing / 5);
+      soul.karmicDebt += debtCharge;
+      soul.log.push({ time: soul.history.length-1, event:'Failed Crossing Attempt', desc:`Did not complete crossing; charged karmic debt +${debtCharge}.`, delta: {} });
+      soul.crossingProgress = 0;
+      soul.crossingTurnsLeft = Math.max(3, Math.floor(soul.crossingMaxTurns / 2));
+      if (soul.karmicDebt >= soul.maxKarmicDebt) {
+        reincarnateSoul(soul);
+      }
+    }
+  }
+}
+
+/* Reincarnation routine */
+function reincarnateSoul(soul) {
+  soul.reincarnations = (soul.reincarnations || 0) + 1;
+  soul.log.push({ time: soul.history.length-1, event:'Reincarnated', desc:`Karmic debt reached ${soul.karmicDebt}. Reincarnated (#${soul.reincarnations}).`, delta: {} });
+
+  // Reset attributes to archetype base with penalties/shift
+  const base = defaultBaseForArchetype(soul.archetype);
+  const penaltyWisdom = 8 * Math.min(3, soul.reincarnations);
+  const addedShadow = 6 * Math.min(4, soul.reincarnations);
+  for (let i=0;i<ATTRS.length;i++){
+    const name = ATTRS[i];
+    let val = base[i];
+    if (name === 'Wisdom') val = clamp(val - penaltyWisdom);
+    if (name === 'Shadow') val = clamp(val + addedShadow);
+    soul.attrs[name] = val;
+  }
+  // reset crossing state to attempt again
+  soul.phase = 'crossing';
+  soul.crossingProgress = 0;
+  soul.crossingTurnsLeft = soul.crossingMaxTurns;
+  soul.karmicDebt = 0;
+  soul.history.push({...soul.attrs});
+}
+
+/* Draw radar chart */
+function drawRadar(canvas, attrs) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const cx = w/2, cy = h/2;
+  const r = Math.min(w,h)/2 - 28;
+  const n = ATTRS.length;
+  ctx.strokeStyle = '#1b2a33'; ctx.lineWidth=1;
+  for (let ring=4; ring>=1; ring--) {
+    ctx.beginPath();
+    for (let i=0;i<n;i++){
+      const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+      const rad = r*(ring/4);
+      const x = cx + Math.cos(ang)*rad;
+      const y = cy + Math.sin(ang)*rad;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath(); ctx.stroke();
+  }
+  ctx.fillStyle = '#9fb1c4'; ctx.font = '12px Inter, Arial';
+  for (let i=0;i<n;i++){
+    const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+    const x = cx + Math.cos(ang)*r;
+    const y = cy + Math.sin(ang)*r;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke();
+    const lx = cx + Math.cos(ang)*(r+18);
+    const ly = cy + Math.sin(ang)*(r+18);
+    ctx.fillText(ATTRS[i], lx - 20, ly+4);
+  }
+  ctx.beginPath();
+  for (let i=0;i<n;i++){
+    const val = attrs[ATTRS[i]]/100;
+    const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+    const x = cx + Math.cos(ang)*r*val;
+    const y = cy + Math.sin(ang)*r*val;
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(42,210,178,0.18)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(42,210,178,0.9)';
+  ctx.lineWidth=2; ctx.stroke();
+  for (let i=0;i<n;i++){
+    const val = attrs[ATTRS[i]]/100;
+    const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+    const x = cx + Math.cos(ang)*r*val;
+    const y = cy + Math.sin(ang)*r*val;
+    ctx.beginPath();
+    ctx.fillStyle = '#2ad2b2'; ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+  }
+}
+
+/* Draw timeline */
+function drawTimeline(canvas, history) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  if (history.length === 0) return;
+  const padding = 28;
+  const plotW = w - padding*2;
+  const plotH = h - padding*2;
+  const n = history.length;
+  ctx.strokeStyle = '#0f2330'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.rect(padding, padding, plotW, plotH); ctx.stroke();
+  ctx.fillStyle = '#9fb1c4'; ctx.font = '11px Inter';
+  for (let g=0; g<=4; g++){
+    const y = padding + plotH*(1 - g/4);
+    ctx.strokeStyle = '#07151b'; ctx.beginPath(); ctx.moveTo(padding,y); ctx.lineTo(padding+plotW,y); ctx.stroke();
+    ctx.fillText(String(g*25), 6, y+4);
+  }
+  const colors = ['#ffb86b','#7bd389','#66d3ff','#c68bff','#ff6b9b'];
+  for (let a=0;a<ATTRS.length;a++){
+    ctx.beginPath();
+    for (let i=0;i<n;i++){
+      const val = history[i][ATTRS[a]]/100;
+      const x = padding + (i/(Math.max(1,n-1))) * plotW;
+      const y = padding + plotH*(1 - val);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = colors[a]; ctx.lineWidth = 2; ctx.stroke();
+    const last = history[n-1];
+    const lx = padding + plotW;
+    const ly = padding + plotH*(1 - last[ATTRS[a]]/100);
+    ctx.fillStyle = colors[a]; ctx.fillRect(lx+6, ly-6, 8,8);
+    ctx.fillStyle = '#9fb1c4'; ctx.font = '12px Inter'; ctx.fillText(ATTRS[a], lx+18, ly+2);
+  }
+}
+
+/* UI wiring */
+let soul = null;
+let playInterval = null;
+
+const radar = document.getElementById('radar');
+const timeline = document.getElementById('timeline');
+const displayName = document.getElementById('displayName');
+const displayType = document.getElementById('displayType');
+const attrText = document.getElementById('attrText');
+const logEl = document.getElementById('log');
+const phaseLabel = document.getElementById('phaseLabel');
+const crossMeter = document.getElementById('crossMeter');
+const crossText = document.getElementById('crossText');
+const karmicText = document.getElementById('karmicText');
+const turnsLeftEl = document.getElementById('turnsLeft');
+const reincCountEl = document.getElementById('reincCount');
+const promptText = document.getElementById('promptText');
+const ageBtn = document.getElementById('ageBtn');
+const choiceContainer = document.getElementById('choiceContainer');
+const autoToggle = document.getElementById('autoToggle');
+
+function refreshUI() {
+  if (!soul) {
+    displayName.textContent = '—';
+    displayType.textContent = '';
+    phaseLabel.textContent = '';
+    attrText.textContent = 'Create a soul to start.';
+    drawRadar(radar, {Curiosity:0,Compassion:0,Courage:0,Wisdom:0,Shadow:0});
+    drawTimeline(timeline, []);
+    logEl.innerHTML = '';
+    crossMeter.style.width = '0%';
+    crossText.textContent = '—';
+    karmicText.textContent = '0';
+    turnsLeftEl.textContent = '—';
+    reincCountEl.textContent = '0';
+    promptText.textContent = 'Press “Age Up” to begin — each click advances one turn/year.';
+    choiceContainer.innerHTML = '';
+    ageBtn.disabled = true;
+    return;
+  }
+  displayName.textContent = soul.name;
+  displayType.textContent = ' — ' + soul.archetype;
+  phaseLabel.textContent = ` • Phase: ${soul.phase.toUpperCase()}`;
+  document.getElementById('ageLabel').textContent = `Age: ${soul.age}`;
+  attrText.textContent = ATTRS.map(a => `${a}: ${soul.attrs[a]}`).join(' • ');
+  drawRadar(radar, soul.attrs);
+  drawTimeline(timeline, soul.history);
+
+  logEl.innerHTML = soul.log.slice(-120).reverse().map(e=>{
+    const d = e.delta || {};
+    const summary = ATTRS.map(k => (d[k] ? (d[k]>0?'+':'')+d[k] : '')).filter(s => s).join(' ');
+    return `<div style="padding:6px;border-bottom:1px dashed #071822"><strong>${e.event}</strong> — ${e.desc}<div class="muted" style="font-size:12px;margin-top:6px">${summary}</div></div>`;
+  }).join('');
+
+  const pct = Math.round(100 * Math.min(1, soul.crossingProgress / Math.max(1, soul.crossingGoal)));
+  crossMeter.style.width = pct + '%';
+  crossText.textContent = `${soul.crossingProgress}/${soul.crossingGoal} (goal)`;
+  karmicText.textContent = String(soul.karmicDebt);
+  turnsLeftEl.textContent = String(soul.crossingTurnsLeft);
+  reincCountEl.textContent = String(soul.reincarnations || 0);
+
+  ageBtn.disabled = false;
+}
+
+/* wiring create / random / reset */
+document.getElementById('createBtn').onclick = ()=>{
+  const name = document.getElementById('soulName').value || 'Unnamed';
+  const arch = document.getElementById('archetype').value;
+  const seedVal = document.getElementById('seed').value || null;
+  soul = createSoul({name, archetype: arch, seed: seedVal});
+  soul.log.push({time:0,event:'Born',desc:`Soul created as ${arch} — passing into crossing`, delta: {...soul.attrs}});
+  refreshUI();
+};
+
+document.getElementById('randomBtn').onclick = ()=>{
+  const archs = ['Wanderer','Healer','Warrior','Seeker','Trickster'];
+  const randomName = ['Asha','Kai','Noor','Orin','Mira','Zane'][Math.floor(Math.random()*6)];
+  document.getElementById('soulName').value = randomName;
+  document.getElementById('archetype').value = archs[Math.floor(Math.random()*archs.length)];
+};
+
+document.getElementById('resetBtn').onclick = ()=>{
+  soul = null; refreshUI();
+};
+
+/* Age Up + event resolution */
+ageBtn.onclick = async ()=>{
+  if(!soul) return alert('Create a soul first.');
+  const { ev, rng } = ageUp(soul);
+  // show prompt
+  if (ev.type === 'routine' && ev.impact) {
+    const effects = ev.impact.effects();
+    applyEffects(soul, effects);
+    soul.history.push({...soul.attrs});
+    soul.log.push({ time: soul.history.length-1, event: 'Event', desc: ev.text, delta: effects });
+    postResolveChecks(soul);
+    refreshUI();
+    announce(ev.text);
+    return;
+  }
+  if (ev.type === 'choice') {
+    promptText.textContent = ev.text;
+    choiceContainer.innerHTML = '';
+    ev.choices.forEach((c, idx) => {
+      const b = document.createElement('button');
+      b.className = 'choiceBtn';
+      b.textContent = c.t;
+      b.onclick = ()=>{
+        const effects = c.effects(rng);
+        applyEffects(soul, effects);
+        soul.history.push({...soul.attrs});
+        soul.log.push({ time: soul.history.length-1, event: c.t, desc: ev.text, delta: effects });
+        postResolveChecks(soul);
+        promptText.textContent = ev.text + ' — ' + c.t;
+        choiceContainer.innerHTML = '';
+        refreshUI();
+      };
+      choiceContainer.appendChild(b);
+    });
+    refreshUI();
+    return;
+  }
+  if (ev.type === 'rare' && ev.impact) {
+    promptText.textContent = ev.text;
+    choiceContainer.innerHTML = '';
+    ev.impact.choices.forEach((c)=>{
+      const b = document.createElement('button');
+      b.className = 'choiceBtn';
+      b.textContent = c.t;
+      b.onclick = ()=>{
+        const effects = c.effects(rng);
+        applyEffects(soul, effects);
+        soul.history.push({...soul.attrs});
+        soul.log.push({ time: soul.history.length-1, event: c.t, desc: ev.text, delta: effects });
+        postResolveChecks(soul);
+        promptText.textContent = ev.text + ' — ' + c.t;
+        choiceContainer.innerHTML = '';
+        refreshUI();
+      };
+      choiceContainer.appendChild(b);
+    });
+    refreshUI();
+    return;
+  }
+};
+
+/* simple announce helper */
+function announce(text) {
+  promptText.textContent = text;
+}
+
+/* autoplay handling */
+autoToggle.onchange = ()=>{
+  if (autoToggle.checked) {
+    if (!soul) { autoToggle.checked = false; return; }
+    playInterval = setInterval(()=> {
+      if (!soul) return clearInterval(playInterval);
+      ageBtn.click();
+      // small stop if choices appear (to let player choose)
+      if (choiceContainer.children.length > 0) {
+        clearInterval(playInterval);
+        playInterval = null;
+        autoToggle.checked = false;
+      }
+    }, 700);
+  } else {
+    if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  }
+};
+
+/* export json/png */
+document.getElementById('exportJson').onclick = ()=>{
+  if(!soul) return alert('Create a soul first.');
+  const data = JSON.stringify(soul, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = (soul.name || 'soul') + '.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.getElementById('exportPng').onclick = ()=>{
+  if(!soul) return alert('Create a soul first.');
+  const mergeW = radar.width + timeline.width + 40;
+  const mergeH = Math.max(radar.height, timeline.height) + 40;
+  const mCanvas = document.createElement('canvas'); mCanvas.width = mergeW; mCanvas.height = mergeH;
+  const mctx = mCanvas.getContext('2d');
+  mctx.fillStyle = '#05060a'; mctx.fillRect(0,0,mergeW,mergeH);
+  mctx.drawImage(radar, 10, 10);
+  mctx.drawImage(timeline, radar.width + 20, 10);
+  const a = document.createElement('a');
+  a.href = mCanvas.toDataURL('image/png'); a.download = (soul.name || 'soul') + '.png'; a.click();
+};
+
+/* initial state */
+refreshUI();
+
+</script>
+</body>
+</html>
